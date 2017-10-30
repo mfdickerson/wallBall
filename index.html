@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lan="en">
+	<head>
+		<meta charset="utf-8">
+    	<meta author="Mark Dickerson">
+		<title>Ball Physics Engine</title>
+		<script type="text/javascript" src="../lib/webgl-utils.js"></script>
+		<script type="text/javascript" src="../lib/MV.js"></script>
+		<script type="text/javascript" src="../lib/InitShaders.js"></script>
+		
+		
+		<script type="text/javascript" src="WallBall.js">
+			vertexShader = "vertex-shader-phong";
+			fragmentShader = "fragment-shader-phong";
+		</script>
+		
+	
+		
+		<script id="vertex-shader-phong" type="x-shader/x-vertex">
+			attribute vec4 a_Position;
+			attribute vec3 a_Normal;
+			attribute vec2 a_TexCoord; // texture coordinate of the vertex
+
+			uniform mat4 u_Projection;
+			uniform mat4 u_ViewMatrix;
+			uniform mat4 u_ModelMatrix;
+
+			uniform vec3 u_LightPosition;
+
+			//uniform int u_ColorType;
+			
+			varying vec3 v_Position;
+			varying vec3 v_Normal;
+
+			varying vec3 v_LightPosition;
+
+			varying vec2 v_TexCoord; // pass texture coordinates to the fragment shader
+		
+			
+			void main(){
+			
+				gl_Position = u_Projection* u_ViewMatrix*u_ModelMatrix*a_Position;
+				
+				v_Normal = mat3(u_ViewMatrix*u_ModelMatrix)*a_Normal;
+				v_LightPosition = (u_ViewMatrix*vec4(u_LightPosition ,1.0)).xyz;
+				v_Position = (u_ViewMatrix*u_ModelMatrix*a_Position).xyz;
+				
+	
+				v_TexCoord = a_TexCoord;
+				
+				
+				
+			}
+		</script>
+		
+		<script id="fragment-shader-phong" type="x-shader/x-fragment">
+			precision mediump float;
+			
+
+			varying vec3 v_Position;
+
+			//varying vec3 v_Color;
+			varying vec3 v_Normal;
+			varying vec3 v_LightPosition;
+
+
+			varying vec2 v_TexCoord;
+			
+			uniform sampler2D u_Sampler; // our texture map
+
+
+			// We Need to set These in .js
+			uniform float u_Shininess;
+
+			uniform vec3 u_AmbientLight; 
+			uniform vec3 u_DiffuseLight;
+			uniform vec3 u_SpecularLight;
+
+			uniform int u_ColorType;
+			uniform vec3 u_BallColor;
+
+			
+			
+			vec3 ambient, diffuse, specular;
+
+			vec3 L, N, V, H, P;
+
+			void main(){
+				
+				P = v_Position;
+			
+				N = normalize(v_Normal);
+				L = normalize(v_LightPosition - P);
+				V = normalize( -P);
+				H = normalize(L+V);
+
+
+
+				vec3 color;
+				if (u_ColorType == 1) {
+					color = vec3(texture2D(u_Sampler, v_TexCoord));
+				} else {
+					color = u_BallColor;
+				}
+				
+
+				
+				
+				ambient = color * u_AmbientLight;
+				diffuse = color * max(dot(L, N), 0.0)* u_DiffuseLight;
+				specular = max(color * pow(max(dot(N, H), 0.0), u_Shininess) * u_SpecularLight, 0.0) ;
+				
+				
+				gl_FragColor = vec4( ambient + diffuse+specular, 1.0);
+			
+			
+			}
+		</script>
+		
+		<style type="text/css">
+		    #title {
+        		text-align: center;
+        		vertical-align: middle;
+        		height: 50px;
+
+      		}
+
+			#canvas {
+			  /*display: inline-block;*/
+				float:left; /* add this */
+				position: relative;
+				height: 640px;
+				width: 640px;
+			}
+			
+			#gl-canvas {
+				position: absolute;
+  				left: 0px;
+				top: 0px;
+			}
+
+			#overCanvas {
+				position: absolute;
+				left: 0px;
+				top: 0px;
+				z-index: ;
+			}
+
+			#text {
+				/*display: inline-block;*/
+			  	overflow: hidden; /* if you don't want to wrap below canvas */
+			  	height: 640px;
+
+			}
+
+			#border {
+				height: 638px;
+				margin-left:8px;
+				border:1px solid black;
+				border-bottom: 1px solid;
+
+
+			}
+
+			#options {
+
+
+			    padding-top: 0px;
+    			padding-right: 16px;
+    			padding-bottom: 0px;
+    			padding-left: 16px;
+    			
+			}
+
+			#description {
+
+			    padding-top: 0px;
+    			padding-right: 16px;
+    			padding-bottom: 0px;
+    			padding-left: 16px;	
+			}
+
+			#footer {
+        		text-align: center;
+        		font-size: 8px;
+      		}
+
+			hr {
+				margin-left :8px;
+				margin-right: 8px;
+			}
+		</style>
+	</head>
+
+	<body>
+		<div id="title">
+      		<h1>WALL BALL</h1>
+    	</div>
+		<div id="canvas">
+			<canvas id="gl-canvas" width="640" height="640">
+				You need a better web browser
+			</canvas>
+			<canvas id="overCanvas" width="640" height="640"></canvas>
+		</div>
+		<div id="text">
+			<div id="border">
+				<div id="options">
+
+					<h2>World</h2>
+					<p>
+						<button type="button" id="clearButton">Clear (C)</button>
+						<button type="button" id="pauseButton">Pause (Spacebar)</button>
+						<button type="button" id="shakeButton">Shake Box (S)</button>
+
+					</p>
+
+					<p>
+						Gravity: <input type="range" id="gravitySlider" min="-20" max="20" value="-9.81" step="0.1"/>
+						<input type="text" id="gravityDisplay" value="-9.81" />
+					</p>
+					<p>
+						Speed: <input type="range" id="speedSlider" min="0.1" max="10" value="1.0" step="0.1"/>
+						<input type="text" id="speedDisplay" value="1.0" />
+					</p>
+
+					
+					<h2>Add Balls</h2>
+					<p>
+		 				<button type="button" id="addBallButton">Add Ball (A)</button>
+		 				<button type="button" id="addRandomBallButton">Add Random (R)</button>
+					</p>
+
+					<p>
+						Radius: <input type="range" id="radiusSlider" min="0.025" max="0.25" value="0.1" step ="0.005"/>
+						<input type="text" id="radiusDisplay" value="0.1" />
+					</p>
+
+					<p>
+						Mass: <input type="range" id="massSlider" min="0.1" max="10" value="1" step ="0.1"/>
+						<input type="text" id="massDisplay" value="1" />
+					</p>
+
+					<p>
+						Bounciness: <input type="range" id="bouncinessSlider" min="0" max="1" value="0.8" step ="0.05"/>
+						<input type="text" id="bouncinessDisplay" value="0.8" />
+					</p>
+
+					<p>
+						Color: <input id="colorPicker" class="form-control" value="#ff0000" type="color">
+					</p>
+
+				</div>
+				<hr>
+				<div id = "description">
+					<h2>Additional Controls</h2>
+					<ul>
+						<li> Right-click on a ball to throw it against a wall. Right-clicking will also enable you to view a ball's mass, bounciness, and speed.
+						<li> Left-click on a ball to remove it from the box</li>
+					</ul>
+				</div>
+			</div>
+		</div>
+	
+	</body>
+	<footer>
+	  <div id="footer">
+	    <br>Mark Dickerson & George Katsaounis
+	    <br>Middlebury College - CSCI 0461
+	    <br>May 2014
+	  </div>
+	</footer>
+</html>
